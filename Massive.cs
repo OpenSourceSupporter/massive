@@ -114,8 +114,10 @@ namespace Massive {
             return dm;
         }
         public DynamicModel(string connectionStringName, string tableName = "",
-            string primaryKeyField = "", string descriptorField = "") {
+            string primaryKeyField = "", string descriptorField = "", string schemaName = "")
+        {
             TableName = tableName == "" ? this.GetType().Name : tableName;
+            SchemaName = schemaName == "" ? "" : schemaName;
             PrimaryKeyField = string.IsNullOrEmpty(primaryKeyField) ? "ID" : primaryKeyField;
             DescriptorField = descriptorField;
             var _providerName = "System.Data.SqlClient";
@@ -184,8 +186,11 @@ namespace Massive {
         IEnumerable<dynamic> _schema;
         public IEnumerable<dynamic> Schema {
             get {
-                if (_schema == null)
-                    _schema = Query("SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = @0", TableName);
+                if (_schema == null) { 
+                    string schemaCondition = "";
+                    if (SchemaName.Length > 0) { schemaCondition = "AND TABLE_SCHEMA = @1"; }
+                    _schema = Query("SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = @0"+schemaCondition, TableName, SchemaName);
+                }
                 return _schema;
             }
         }
@@ -298,13 +303,14 @@ namespace Massive {
             return result;
         }
         public virtual string TableName { get; set; }
+        public virtual string SchemaName { get; set; }
         /// <summary>
         /// Returns all records complying with the passed-in WHERE clause and arguments, 
         /// ordered as specified, limited (TOP) by limit.
         /// </summary>
         public virtual IEnumerable<dynamic> All(string where = "", string orderBy = "", int limit = 0, string columns = "*", params object[] args) {
             string sql = BuildSelect(where, orderBy, limit);
-            return Query(string.Format(sql, columns, TableName), args);
+            return Query(string.Format(sql, columns, SchemaName.Length == 0 ? TableName : String.Format("{0}.{1}",SchemaName,TableName)), args);
         }
         private static string BuildSelect(string where, string orderBy, int limit) {
             string sql = limit > 0 ? "SELECT TOP " + limit + " {0} FROM {1} " : "SELECT {0} FROM {1} ";
